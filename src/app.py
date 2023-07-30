@@ -60,15 +60,15 @@ def main():
         secrets["SLING_USERNAME"], secrets["SLING_PASSWORD"], SLING_TTL_SECS
     )
     db = Database(
-        secrets["CTE_DB_PATH"],
-        secrets["CAMPUS_ROSTER_PATH"],
+        "../" + secrets["CTE_DB_PATH"],
+        "../" + secrets["CAMPUS_ROSTER_PATH"],
         secrets["BOOKEO_SECRET_KEY"],
         secrets["BOOKEO_API_KEY"],
     )
     slack = SlackApp(
         secrets["SLACK_BOT_TOKEN"],
         secrets["SLACK_SIGNING_SECRET"],
-        secrets["MSG_QUEUE_PATH"],
+        "../" + secrets["MSG_QUEUE_PATH"],
         QUIET_HOURS_START,
         QUIET_HOURS_END,
     )
@@ -117,7 +117,7 @@ def test():
     slack = SlackApp(
         secrets["SLACK_BOT_TOKEN"],
         secrets["SLACK_SIGNING_SECRET"],
-        secrets["MSG_QUEUE_PATH"],
+        "../" + secrets["MSG_QUEUE_PATH"],
         QUIET_HOURS_START,
         QUIET_HOURS_END,
     )
