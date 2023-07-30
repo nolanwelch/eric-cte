@@ -1,16 +1,14 @@
 import logging
 import os
-import sys
 import time
 from datetime import timedelta
 
 from Booking import Booking
 from Database import Database
 from dotenv import dotenv_values
+from Event import Event
 from SlackApp import SlackApp
 from SlingApp import SlingApp
-
-SLING_TTL_SECS = 86_400
 
 os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
@@ -51,9 +49,8 @@ def validate_secrets(secrets: dict) -> None:
 def main():
     secrets = get_secrets("config.env")
     validate_secrets(secrets)
-    sling = SlingApp(
-        secrets["SLING_USERNAME"], secrets["SLING_PASSWORD"], SLING_TTL_SECS
-    )
+
+    sling = SlingApp(secrets["SLING_USERNAME"], secrets["SLING_PASSWORD"])
     db = Database(
         secrets["CTE_DB_PATH"],
         secrets["CAMPUS_ROSTER_PATH"],
@@ -65,11 +62,12 @@ def main():
         secrets["SLACK_SIGNING_SECRET"],
         secrets["MSG_QUEUE_PATH"],
     )
+
     last_queue_check = -1
     last_booking_fetch = -1
 
     admins = db.get_admins()
-    admin_ids = [x["slackID"] for x in admins]
+    admin_ids = [a.slack_id for a in admins]
 
     while True:
         # TODO: Organize code
@@ -93,10 +91,11 @@ def main():
         for b in new_bookings:
             # TODO: For each new booking, notify the employee assigned to the shift
             pass
-        # TODO: Check for replies from Slack (events)
-        events = []
-        for e in events:
-            slack.send_multiple(admin_ids, e)
+
+        for e in slack.get_new_events():
+            e.handle(admin_ids)
+
+        time.sleep(30)
 
 
 # def test():

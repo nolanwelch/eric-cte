@@ -1,12 +1,12 @@
 import json
 import logging
 import os
+import time
 from datetime import datetime
 
-
-import time
 import requests
 import slack_bolt
+from Event import Event
 from Singleton import Singleton
 
 
@@ -18,17 +18,17 @@ class SlackApp(metaclass=Singleton):
         if not os.path.exists(message_queue_filepath):
             raise Exception("Message queue filepath not found")
         self.message_queue_filepath = message_queue_filepath
-        self.messages_queued = self.are_messages_queued()
+        self.messages_queued = self._are_messages_queued()
         # self.app = slack_bolt.App(token=token, signing_secret=secret)
         # self.app.start()
         logging.info("Launched Slack app")
 
-    def in_quiet_hrs(self) -> bool:
+    def _in_quiet_hrs(self) -> bool:
         """Determine whether quiet hours are currently in effect"""
         hr = datetime.now().hour
         return not (self.QUIET_HOURS_END <= hr < self.QUIET_HOURS_START)
 
-    def are_messages_queued(self) -> bool:
+    def _are_messages_queued(self) -> bool:
         """Check whether messages remain in the message queue"""
         try:
             with open(self.message_queue_filepath, "r") as f:
@@ -41,8 +41,8 @@ class SlackApp(metaclass=Singleton):
     def send_message(self, user_id: str, msg):
         try:
             msg = str(msg)
-            if self.in_quiet_hrs():
-                self.queue_message(user_id, msg)
+            if self._in_quiet_hrs():
+                self._queue_message(user_id, msg)
                 return
             # result = requests.post(
             #     "https://slack.com/api/chat.postMessage",
@@ -63,8 +63,9 @@ class SlackApp(metaclass=Singleton):
         for u in users:
             self.send_message(u, msg)
 
-    def queue_message(self, user_id: str, msg: str):
+    def _queue_message(self, user_id: str, msg: str):
         """Queue a message to be sent outside of quiet hours"""
+        # TODO: Add some more error handling for malformed JSON
         try:
             with open(self.message_queue_filepath, "r+") as f:
                 data = json.loads(f.read() or "[]")
@@ -80,7 +81,7 @@ class SlackApp(metaclass=Singleton):
     def send_queued_messages(self):
         """Send all messages that have been queued"""
         try:
-            if not self.messages_queued or self.in_quiet_hrs():
+            if not self.messages_queued or self._in_quiet_hrs():
                 return
             with open(self.message_queue_filepath, "r+") as f:
                 data = json.loads(f.read() or "[]")
@@ -94,3 +95,11 @@ class SlackApp(metaclass=Singleton):
             self.messages_queued = False
         except Exception as e:
             logging.error(f"Error when sending queued message(s): {e}")
+
+    def get_new_events(self) -> list[Event]:
+        try:
+            events = []
+
+            return events
+        except Exception as e:
+            logging.error(f"Error when fetching new events: {e}")
