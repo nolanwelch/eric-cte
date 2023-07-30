@@ -12,6 +12,8 @@ from Singleton import Singleton
 
 ZULU_FORMAT = r"%Y-%m-%dT%H:%M:00Z"
 BOOKEO_FETCH_DELAY_SECS = 300
+DB_TTL_SECS = 259_200  # 3 days
+CLEAR_DELAY_SECS = 86_400  # 24 hrs
 
 
 class Database(metaclass=Singleton):
@@ -35,9 +37,30 @@ class Database(metaclass=Singleton):
             self._bookeo_secret_key = bookeo_secret_key
             self._bookeo_api_key = bookeo_api_key
             self._last_fetch = -1
+            self._last_clear = -1
         except:
             raise Exception("SQLite connection unsuccessful")
 
+    def _ttl(func):
+        """Decorator to check whether the database should be
+        purged of old entries before executing the function"""
+
+        def decorator(self, *args, **kwargs):
+            if time.time() - self._last_clear > CLEAR_DELAY_SECS:
+                self._clear()
+            return func(self, *args, **kwargs)
+
+        return decorator
+
+    def _clear(self):
+        try:
+            q = "DELETE FROM Bookings WHERE startTime<?"
+            res = self._cur.execute(q, time.time() - DB_TTL_SECS)
+            # TODO: Add handling based on value of res
+        except Exception as e:
+            logging.error(f"Error when purging old Bookings entries: {e}")
+
+    @_ttl
     def fetch_bookings(self, delta: timedelta) -> list[Booking]:
         """Returns all bookings scheduled between now and (now + delta)"""
         if time.time() - self._last_fetch <= BOOKEO_FETCH_DELAY_SECS:
@@ -65,6 +88,7 @@ class Database(metaclass=Singleton):
             logging.error("Could not fetch bookings from Bookeo")
             return []
 
+    @_ttl
     def update_database(self, entries: list[Booking]):
         try:
             # TODO: Update this method to use the Booking object
@@ -80,8 +104,13 @@ class Database(metaclass=Singleton):
         except Exception as e:
             logging.error(f"Error when inserting bookings into database")
 
+    @_ttl
     def fetch_new_on_campus_pids() -> list[int]:
-        pass
+        try:
+            pass
+        except Exception as e:
+            logging.error(f"Error fetching new on-campus PIDs: {e}")
+            return []
 
     def is_on_campus_student(self, pid: int) -> bool:
         try:
@@ -94,6 +123,7 @@ class Database(metaclass=Singleton):
             logging.error(f"Error reading from PID file: {e}")
             return False
 
+    @_ttl
     def get_admins(self) -> list[Employee]:
         # TODO: Rewrite this to use the Employee class
         """Return all employee entries that are marked as admins"""
