@@ -1,17 +1,19 @@
 import logging
 import os
 import sqlite3
+import time
 from csv import DictReader
 from datetime import datetime, timedelta
 
 import requests
 from Singleton import Singleton
 
-
 ZULU_FORMAT = r"%Y-%m-%dT%H:%M:00Z"
 
 
 class Database(metaclass=Singleton):
+    BOOKING_FETCH_DELAY_SECS = 300
+
     def __init__(
         self,
         db_filepath: str,
@@ -31,11 +33,14 @@ class Database(metaclass=Singleton):
             self.roster_filepath = roster_filepath
             self.bookeo_secret_key = bookeo_secret_key
             self.bookeo_api_key = bookeo_api_key
+            self.last_fetch = -1
         except:
             raise Exception("SQLite connection unsuccessful")
 
     def fetch_bookings(self, delta: timedelta) -> list[dict]:
         """Returns all bookings scheduled between now and (now + delta)"""
+        if time.time() - self.last_fetch <= self.BOOKING_FETCH_DELAY_SECS:
+            return []
         current_time = datetime.now()
         bookings = requests.get(
             "https://api.bookeo.com/v2/bookings",

@@ -3,20 +3,18 @@ import logging
 import os
 from datetime import datetime
 
+
+import time
 import requests
 import slack_bolt
 from Singleton import Singleton
 
 
 class SlackApp(metaclass=Singleton):
-    def __init__(
-        self,
-        token: str,
-        secret: str,
-        message_queue_filepath: str,
-        quiet_hrs_start: int,
-        quiet_hrs_end: int,
-    ):
+    QUIET_HOURS_END = 8  # 8:00 AM
+    QUIET_HOURS_START = 21  # 9:00 PM
+
+    def __init__(self, token: str, secret: str, message_queue_filepath: str):
         if not os.path.exists(message_queue_filepath):
             raise Exception("Message queue filepath not found")
         self.message_queue_filepath = message_queue_filepath
@@ -24,13 +22,11 @@ class SlackApp(metaclass=Singleton):
         # self.app = slack_bolt.App(token=token, signing_secret=secret)
         # self.app.start()
         logging.info("Launched Slack app")
-        self.quiet_hrs_start = quiet_hrs_start
-        self.quiet_hrs_end = quiet_hrs_end
 
     def in_quiet_hrs(self) -> bool:
         """Determine whether quiet hours are currently in effect"""
         hr = datetime.now().hour
-        return not (self.quiet_hrs_end <= hr < self.quiet_hrs_start)
+        return not (self.QUIET_HOURS_END <= hr < self.QUIET_HOURS_START)
 
     def are_messages_queued(self) -> bool:
         """Check whether messages remain in the message queue"""
