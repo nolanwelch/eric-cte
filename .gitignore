@@ -1,3 +1,8 @@
+# Program files
+data/msg_queue.json
+data/roster.csv
+data/cte.sqlite3
+
 # Developer keys
 src/config.env
 
