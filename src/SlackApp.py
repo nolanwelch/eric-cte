@@ -38,8 +38,9 @@ class SlackApp(metaclass=Singleton):
             logging.error(f"Error checking if messages queued: {e}")
             return False
 
-    def send_message(self, user_id: str, msg: str):
+    def send_message(self, user_id: str, msg):
         try:
+            msg = str(msg)
             if self.in_quiet_hrs():
                 self.queue_message(user_id, msg)
                 return
@@ -56,6 +57,11 @@ class SlackApp(metaclass=Singleton):
             logging.info(str(result))
         except Exception as e:
             logging.error(f"Error posting message to Slack: {e}")
+
+    def send_multiple(self, users: list[str], msg):
+        """Send the same message to a list of Slack IDs"""
+        for u in users:
+            self.send_message(u, msg)
 
     def queue_message(self, user_id: str, msg: str):
         """Queue a message to be sent outside of quiet hours"""

@@ -4,6 +4,7 @@ import sys
 import time
 from datetime import timedelta
 
+from Booking import Booking
 from Database import Database
 from dotenv import dotenv_values
 from SlackApp import SlackApp
@@ -13,8 +14,7 @@ SLING_TTL_SECS = 86_400
 
 os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
-# TODO LIST
-# - Graph program logic flow
+# TODO
 # - Get shifts from Sling for given date
 # - Listen for Slack reactions and check against ID
 # - Perform on-campus PID checks when new booking detected/sent
@@ -69,6 +69,7 @@ def main():
     last_booking_fetch = -1
 
     admins = db.get_admins()
+    admin_ids = [x["slackID"] for x in admins]
 
     while True:
         # TODO: Organize code
@@ -82,38 +83,38 @@ def main():
         if invalid_pids:
             # Make note in DB that admin has been notified
             # Notify admin
-            for a in admins:
-                # TODO: Add system to tie booking ID and names to PIDs. Use SQL queries.
-                slack.send_message(
-                    a["slackID"],
-                    f"Hey {a['firstName']}, there are some invalid on-campus PIDs in the following bookings {0}. They are: {0}",
-                )
+            slack.send_multiple(admin_ids, "test")
+            # for a in admins:
+            #     # TODO: Add system to tie booking ID and names to PIDs. Use SQL queries.
+            #     slack.send_message(
+            #         a["slackID"],
+            #         f"Hey {a['firstName']}, there are some invalid on-campus PIDs in the following bookings {0}. They are: {0}",
+            #     )
         for b in new_bookings:
             # TODO: For each new booking, notify the employee assigned to the shift
             pass
         # TODO: Check for replies from Slack (events)
         events = []
         for e in events:
-            for a in admins:
-                slack.send_message(a["slackID"], e)
+            slack.send_multiple(admin_ids, e)
 
 
-def test():
-    secrets = get_secrets("config.env")
-    validate_secrets(secrets)
-    slack = SlackApp(
-        secrets["SLACK_BOT_TOKEN"],
-        secrets["SLACK_SIGNING_SECRET"],
-        secrets["MSG_QUEUE_PATH"],
-    )
-    slack.send_message("U05F0L9LN3G", "This is a test!")
-    # sling = SlingApp(
-    #     secrets["SLING_USERNAME"], secrets["SLING_PASSWORD"], SLING_TTL_SECS
-    # )
-    # dt = datetime.fromtimestamp(1688139900).strftime(r"%Y-%m-%dT%H:%M:00Z")
-    # print(dt)
-    # print(sling.fetch_employee_id(dt))
-    sys.exit()
+# def test():
+#     secrets = get_secrets("config.env")
+#     validate_secrets(secrets)
+#     slack = SlackApp(
+#         secrets["SLACK_BOT_TOKEN"],
+#         secrets["SLACK_SIGNING_SECRET"],
+#         secrets["MSG_QUEUE_PATH"],
+#     )
+#     slack.send_message("U05F0L9LN3G", "This is a test!")
+#     # sling = SlingApp(
+#     #     secrets["SLING_USERNAME"], secrets["SLING_PASSWORD"], SLING_TTL_SECS
+#     # )
+#     # dt = datetime.fromtimestamp(1688139900).strftime(r"%Y-%m-%dT%H:%M:00Z")
+#     # print(dt)
+#     # print(sling.fetch_employee_id(dt))
+#     sys.exit()
 
 
 if __name__ == "__main__":

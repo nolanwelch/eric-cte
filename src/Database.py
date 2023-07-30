@@ -6,14 +6,15 @@ from csv import DictReader
 from datetime import datetime, timedelta
 
 import requests
+from Booking import Booking
+from Employee import Employee
 from Singleton import Singleton
 
 ZULU_FORMAT = r"%Y-%m-%dT%H:%M:00Z"
+BOOKEO_FETCH_DELAY_SECS = 300
 
 
 class Database(metaclass=Singleton):
-    BOOKING_FETCH_DELAY_SECS = 300
-
     def __init__(
         self,
         db_filepath: str,
@@ -26,20 +27,20 @@ class Database(metaclass=Singleton):
         elif not os.path.exists(roster_filepath):
             raise Exception("Roster filepath not found")
         try:
-            self.conn: sqlite3.Connection = sqlite3.connect(db_filepath)
-            self.cur: sqlite3.Cursor = self.conn.cursor
+            self._conn: sqlite3.Connection = sqlite3.connect(db_filepath)
+            self._cur: sqlite3.Cursor = self._conn.cursor
             logging.info("Successfully connected to SQL database")
-            self.db_filepath = db_filepath
-            self.roster_filepath = roster_filepath
-            self.bookeo_secret_key = bookeo_secret_key
-            self.bookeo_api_key = bookeo_api_key
-            self.last_fetch = -1
+            self._db_filepath = db_filepath
+            self._roster_filepath = roster_filepath
+            self._bookeo_secret_key = bookeo_secret_key
+            self._bookeo_api_key = bookeo_api_key
+            self._last_fetch = -1
         except:
             raise Exception("SQLite connection unsuccessful")
 
-    def fetch_bookings(self, delta: timedelta) -> list[dict]:
+    def fetch_bookings(self, delta: timedelta) -> list[Booking]:
         """Returns all bookings scheduled between now and (now + delta)"""
-        if time.time() - self.last_fetch <= self.BOOKING_FETCH_DELAY_SECS:
+        if time.time() - self._last_fetch <= BOOKEO_FETCH_DELAY_SECS:
             return []
         current_time = datetime.now()
         bookings = requests.get(
@@ -47,29 +48,34 @@ class Database(metaclass=Singleton):
             params={
                 "startTime": current_time.strftime(ZULU_FORMAT),
                 "endTime": (current_time + delta).strftime(ZULU_FORMAT),
-                "secretKey": self.bookeo_secret_key,
-                "apiKey": self.bookeo_api_key,
+                "secretKey": self._bookeo_secret_key,
+                "apiKey": self._bookeo_api_key,
             },
         )
         if bookings.status_code == 200:
             data = bookings.json()["data"]
+
+            # TODO: Update this list comprehension once Booking class is fleshed out
             data["startTime"] = datetime.strptime(data["startTime"])
             logging.info(f"Fetched {len(data)} booking(s) from Bookeo")
+            data = [Booking(0, d["startTime"]) for d in data]
+
             return data
         else:
             logging.error("Could not fetch bookings from Bookeo")
             return []
 
-    def update_database(self, entries: list[dict]):
+    def update_database(self, entries: list[Booking]):
         try:
+            # TODO: Update this method to use the Booking object
             data = [
-                (e["bookingID"], e["startTime"], e["employeeID"], 0, 0, 0)
+                (e.id, e.start_time.strftime(ZULU_FORMAT), e.employee_id, 0, 0, 0)
                 for e in entries
             ]
             # TODO: Implement system to handle duplicates and check for changes
             q = "INSERT INTO bookings VALUES (?, ?, ?, ?, ?, ?)"
-            res = self.cur.executemany(q, data)  # what does res give us?
-            self.conn.commit()
+            res = self._cur.executemany(q, data)  # what does cur.executemany return?
+            self._conn.commit()
             logging.info("Inserted bookings into database")
         except Exception as e:
             logging.error(f"Error when inserting bookings into database")
@@ -79,7 +85,7 @@ class Database(metaclass=Singleton):
 
     def is_on_campus_student(self, pid: int) -> bool:
         try:
-            with open(self.roster_filepath, "r") as f:
+            with open(self._roster_filepath, "r") as f:
                 for row in DictReader(f):
                     if int(row["PID"]) == pid:
                         return True
@@ -88,12 +94,13 @@ class Database(metaclass=Singleton):
             logging.error(f"Error reading from PID file: {e}")
             return False
 
-    def get_admins(self) -> list[dict]:
+    def get_admins(self) -> list[Employee]:
+        # TODO: Rewrite this to use the Employee class
         """Return all employee entries that are marked as admins"""
         query = """SELECT (firstName, slackID)
                 FROM employees 
                 WHERE isAdmin=1"""
         return [
             {"firstName": r[0], "slackID": r[1]}
-            for r in self.cur.execute(query).fetchall()
+            for r in self._cur.execute(query).fetchall()
         ]
