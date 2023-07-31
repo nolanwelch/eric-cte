@@ -126,11 +126,24 @@ class Database(metaclass=Singleton):
     @_ttl
     def get_admins(self) -> list[Employee]:
         # TODO: Rewrite this to use the Employee class
+        # TODO: Add error handling
         """Return all employee entries that are marked as admins"""
-        query = """SELECT (firstName, slackID)
-                FROM employees 
-                WHERE isAdmin=1"""
-        return [
-            {"firstName": r[0], "slackID": r[1]}
-            for r in self._cur.execute(query).fetchall()
-        ]
+        try:
+            q = """SELECT (firstName, lastName, slackID)
+                    FROM employees 
+                    WHERE isAdmin=1"""
+            res = self._cur.execute(q).fetchall()
+            return [Employee(r[0], r[1], r[2]) for r in res]
+        except Exception as e:
+            raise Exception(f"Error when getting admin Employee objects: {e}")
+
+    @_ttl
+    def get_employee(self, id: int) -> Employee:
+        try:
+            q = """SELECT (firstName, lastName, slackID)
+            FROM employees
+            WHERE id=?"""
+            res = self._cur.execute(q, id).fetchone()
+            return Employee(res[0], res[1], res[2])
+        except Exception as e:
+            raise Exception(f"Error when getting Employee object for id {id}: {e}")
