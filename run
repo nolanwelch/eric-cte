@@ -2,8 +2,31 @@
 
 cd "$(dirname "$0")"
 
-if ! [ -d ".venv/" ]; then
-    python3 -m venv .venv/
+cfgstr="# KEYS
+BOOKEO_API_KEY=""
+BOOKEO_SECRET_KEY=""
+SLACK_BOT_TOKEN=""
+SLACK_SIGNING_SECRET=""
+SLING_USERNAME=""
+SLING_PASSWORD=""
+
+# FILEPATHS
+CAMPUS_ROSTER_PATH="../data/roster.csv"
+CTE_DB_PATH="../data/cte.sqlite3"
+MSG_QUEUE_PATH="../data/msg_queue.json"
+LOG_PATH="./log.txt”
+
+CFG_FILE="src/config.env"
+VENV_DIR=".venv/"
+
+if ! [ -f "$CFG_FILE" ]; then
+    echo "$cfgstr" > "$CFG_FILE"
+    echo "$CFG_FILE created! Fill it in before running this script again."
+    exit
+fi
+
+if ! [ -d "$VENV_DIR" ]; then
+    python3 -m venv "$VENV_DIR"
 fi
 
 source .venv/bin/activate
