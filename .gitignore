@@ -1,10 +1,10 @@
 # Program files
-data/msg_queue.json
-data/roster.csv
-data/cte.sqlite3
+msg_queue.json
+roster.csv
+cte.sqlite3
 
 # Developer keys
-src/config.env
+config.env
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
