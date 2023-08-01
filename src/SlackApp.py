@@ -40,23 +40,21 @@ class SlackApp(metaclass=Singleton):
             logging.error(f"Error checking if messages queued: {e}")
             return False
 
-    def send_message(self, user_id: str, msg):
+    def send_message(self, channel_id: str, msg):
         try:
             msg = str(msg)
             if self._in_quiet_hrs():
-                self._queue_message(user_id, msg)
+                self._queue_message(channel_id, msg)
                 return
             result = requests.post(
                 "https://slack.com/api/chat.postMessage",
-                params={"token": self._token, "channel": user_id, "text": msg},
+                params={"channel": channel_id, "text": msg},
+                headers={"Authorization": f"Bearer {self._token}"},
             )
-            print(result.status_code)
-            if result.status_code == 200:
+            if result.status_code == 200 and result.json()["ok"]:
                 logging.info("Posted message to Slack")
             else:
                 logging.error("Could not post message to Slack")
-            # result = self.app.client.chat_postMessage("D" + user_id, msg)
-            logging.info(str(result))
         except Exception as e:
             logging.error(f"Error posting message to Slack: {e}")
 
