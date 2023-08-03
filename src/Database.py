@@ -110,7 +110,11 @@ class Database(metaclass=Singleton):
                     if p["peopleCategoryId"] in self.ON_CAMPUS_CATEGORY_IDS
                 ]
                 q = f"""INSERT INTO bookings (id, timestamp)
-                VALUES ({booking_id}, {datetime.fromisoformat(b["startTime"]).start_datetime.astimezone(timezone.utc)})"""
+                SELECT ({booking_id}, {datetime.fromisoformat(b["startTime"]).astimezone(timezone.utc)})
+                WHERE NOT EXISTS
+                    (SELECT id
+                    FROM bookings
+                    WHERE id={booking_id})"""
                 self._cur.execute(q)
 
                 q = f"""INSERT INTO pids (pid, firstName, lastName, bookingID)
