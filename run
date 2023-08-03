@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# All paths relative to this script
+
 cd "$(dirname "$0")"
 
 cfgstr="# KEYS
@@ -11,12 +13,12 @@ SLING_USERNAME=\"\"
 SLING_PASSWORD=\"\"
 
 # FILEPATHS
-CAMPUS_ROSTER_PATH=\"../data/roster.csv\"
-CTE_DB_PATH=\"../data/cte.sqlite3\"
-MSG_QUEUE_PATH=\"../data/msg_queue.json\"
-LOG_PATH=\"../eric.log\""
+CAMPUS_ROSTER_PATH=\"data/roster.csv\"
+CTE_DB_PATH=\"data/cte.sqlite3\"
+MSG_QUEUE_PATH=\"data/msg_queue.json\"
+LOG_PATH=\"logs/eric.log\""
 
-CFG_FILE="src/config.env"
+CFG_FILE="config.env"
 VENV_DIR=".venv/"
 
 if ! [ -f "$CFG_FILE" ]; then
