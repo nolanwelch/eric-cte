@@ -1,8 +1,8 @@
 import json
-import logging
 import os
 import time
 from datetime import datetime
+from logging import Logger
 
 import requests
 import slack_bolt
@@ -14,16 +14,16 @@ class SlackApp(metaclass=Singleton):
     QUIET_HOURS_END = 8  # 8:00 AM
     QUIET_HOURS_START = 21  # 9:00 PM
 
-    def __init__(self, token: str, secret: str, message_queue_filepath: str):
+    def __init__(
+        self, logger: Logger, token: str, secret: str, message_queue_filepath: str
+    ):
         if not os.path.exists(message_queue_filepath):
             raise Exception("Message queue filepath not found")
+        self._logger = logger
         self._message_queue_filepath = message_queue_filepath
         self._messages_queued = self._are_messages_queued()
         self._token = token
         self._secret = secret
-        # self.app = slack_bolt.App(token=token, signing_secret=secret)
-        # self.app.start()
-        # logging.info("Launched Slack app")
 
     def _in_quiet_hrs(self) -> bool:
         """Determine whether quiet hours are currently in effect"""
@@ -37,7 +37,7 @@ class SlackApp(metaclass=Singleton):
                 data = json.loads(f.read() or "[]")
                 return len(data) != 0
         except Exception as e:
-            logging.error(f"Error checking if messages queued: {e}")
+            self._logger.error(f"Error checking if messages queued: {e}")
             return False
 
     def send_message(self, channel_id: str, msg):
@@ -52,11 +52,11 @@ class SlackApp(metaclass=Singleton):
                 headers={"Authorization": f"Bearer {self._token}"},
             )
             if result.status_code == 200 and result.json()["ok"]:
-                logging.info("Posted message to Slack")
+                self._logger.info("Posted message to Slack")
             else:
-                logging.error("Could not post message to Slack")
+                self._logger.error("Could not post message to Slack")
         except Exception as e:
-            logging.error(f"Error posting message to Slack: {e}")
+            self._logger.error(f"Error posting message to Slack: {e}")
 
     def send_multiple(self, users: list[str], msg):
         """Send the same message to a list of Slack IDs"""
@@ -73,10 +73,10 @@ class SlackApp(metaclass=Singleton):
                 f.seek(0)
                 f.truncate()
                 f.write(json.dumps(data))
-            logging.info(f"Queued message to {user_id}")
+            self._logger.info(f"Queued message to {user_id}")
             self._messages_queued = True
         except Exception as e:
-            logging.error(f"Error when queueing message: {e}")
+            self._logger.error(f"Error when queueing message: {e}")
 
     def send_queued_messages(self):
         """Send all messages that have been queued"""
@@ -87,19 +87,20 @@ class SlackApp(metaclass=Singleton):
                 data = json.loads(f.read() or "[]")
                 for m in data:
                     self.send_message(m["user_id"], m["msg"])
-                    logging.info(f"Sent queued message to {m['user_id']}")
-                logging.info(f"Sent {len(data)} queued message(s)")
+                    self._logger.info(f"Sent queued message to {m['user_id']}")
+                self._logger.info(f"Sent {len(data)} queued message(s)")
                 f.seek(0)
                 f.truncate()
                 f.write("[]")
             self._messages_queued = False
         except Exception as e:
-            logging.error(f"Error when sending queued message(s): {e}")
+            self._logger.error(f"Error when sending queued message(s): {e}")
 
+    # TODO: Write this method!
     def fetch_new_events(self) -> list[Event]:
         """Uses the Slack API to fetch new message/react Events"""
         try:
             events = []
             return events
         except Exception as e:
-            logging.error(f"Error when fetching new events: {e}")
+            self._logger.error(f"Error when fetching new events: {e}")
