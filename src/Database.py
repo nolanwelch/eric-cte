@@ -2,7 +2,7 @@ import os
 import sqlite3
 import time
 from csv import DictReader
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from logging import Logger
 
 import requests
@@ -12,15 +12,12 @@ from PID import PID
 from Singleton import Singleton
 
 BOOKEO_FETCH_DELAY_SECS = 300
-DB_TTL_SECS = 259_200  # 3 days
 CLEAR_DELAY_SECS = 86_400  # 24 hrs
-
-# TODO: Make sure that startTime is stored in Unix timestamp format everywhere. Currently in datetime format.
 
 
 class Database(metaclass=Singleton):
     ZULU_FORMAT = r"%Y-%m-%dT%H:%M:00Z"
-    ON_CAMPUS_STUDENT_IDS = ["MPJWRE", "PJNEYX"]
+    ON_CAMPUS_CATEGORY_IDS = ["MPJWRE", "PJNEYX"]
 
     def __init__(
         self,
@@ -61,23 +58,24 @@ class Database(metaclass=Singleton):
 
     def _clear(self):
         try:
-            q = f"DELETE FROM Bookings WHERE startTime<{time.time()-DB_TTL_SECS}"
+            q = f"DELETE FROM bookings WHERE startTime<{time.time()}"
             self._cur.execute(q)
             self._conn.commit()
         except Exception as e:
-            self._logger.error(f"Error when purging old Bookings entries: {e}")
+            self._logger.error(f"Error when purging stale bookings: {e}")
 
     def _zulu_to_datetime(cls, timestamp: str) -> datetime:
         """Converts a timestamp in Zulu format to a datetime object"""
-        return datetime.strptime(cls.ZULU_FORMAT)
+        return datetime.strptime(timestamp, cls.ZULU_FORMAT)
 
     def _datetime_to_zulu(cls, timestamp: datetime) -> str:
         """Converts a datetime object to a Zulu-formatted timestamp"""
         return timestamp.strftime(cls.ZULU_FORMAT)
 
     @_ttl
-    def fetch_new_bookings(self, delta: timedelta) -> list[Booking]:
-        """Uses the Bookeo API to fetch all bookings scheduled between now and (now + delta)"""
+    def fetch_new_bookings(self, delta: timedelta):
+        """Uses the Bookeo API to fetch all bookings scheduled between now and (now + delta)
+        and updates the local database with booking and on-campus PID information"""
         if time.time() - self._last_fetch <= BOOKEO_FETCH_DELAY_SECS:
             return []
         try:
@@ -95,29 +93,38 @@ class Database(metaclass=Singleton):
             if res.status_code != 200:
                 self._logger.error("Could not fetch bookings from Bookeo")
                 return []
-
             data = res.json()["data"]
             self._logger.info(f"Fetched {len(data)} booking(s) from Bookeo")
-            bookings = []
+
             for b in data:
-                booking = Booking(
-                    int(b["bookingNumber"]),
-                    datetime.fromisoformat(b["startTime"]),
-                    b["title"],
+                booking_id = {int(b["bookingNumber"])}
+                on_campus_pids = [
+                    PID(
+                        self._extract_pid_from_custom_fields(
+                            p["personDetails"]["customFields"]
+                        ),
+                        p["personDetails"]["firstName"],
+                        p["personDetails"]["lastName"],
+                    )
+                    for p in b["participants"]["details"]
+                    if p["peopleCategoryId"] in self.ON_CAMPUS_CATEGORY_IDS
+                ]
+                q = f"""INSERT INTO bookings (id, timestamp)
+                VALUES ({booking_id}, {datetime.fromisoformat(b["startTime"]).start_datetime.astimezone(timezone.utc)})"""
+                self._cur.execute(q)
+
+                q = f"""INSERT INTO pids (pid, firstName, lastName, bookingID)
+                    VALUES (? ? ? ?)"""
+                self._cur.executemany(
+                    q,
                     [
-                        PID(
-                            self._extract_pid_from_custom_fields(
-                                p["personDetails"]["customFields"]
-                            ),
-                            p["personDetails"]["firstName"],
-                            p["personDetails"]["lastName"],
-                        )
-                        for p in b["participants"["details"]]
-                        if p["peopleCategoryId"] in self.ON_CAMPUS_STUDENT_IDS
+                        (p.id, p.first_name, p.last_name, booking_id)
+                        for p in on_campus_pids
                     ],
                 )
-                bookings.append(booking)
-            return bookings
+
+            self._conn.commit()
+            self._last_fetch = current_time
         except Exception as e:
             self._logger.error(
                 f"Error occurred while fetching bookings from Bookeo: {e}"
@@ -130,27 +137,14 @@ class Database(metaclass=Singleton):
         return 0
 
     @_ttl
-    def update_database(self, entries: list[Booking]):
+    def get_on_campus_pids(self, booking: Booking) -> list[PID]:
+        """Uses the local database to return the on-campus PIDs associated with the given Booking"""
         try:
-            # TODO: Update this method to use the Booking object. I'll need to find out which fields Bookeo returns to do this.
-            data = [
-                (e.id, self._datetime_to_zulu(e.start_time), e.employee_id, 0, 0, 0)
-                for e in entries
-            ]
-            # TODO: Implement system to handle duplicates and check for changes
-            q = "INSERT INTO bookings VALUES (?, ?, ?, ?, ?, ?)"
-            self._cur.executemany(q, data)
-            self._conn.commit()
-            self._logger.info("Inserted bookings into database")
-        except Exception as e:
-            self._logger.error(f"Error when inserting bookings into database")
-
-    @_ttl
-    def fetch_new_on_campus_pids(self) -> dict[Booking, list[PID]]:
-        """Uses the local database to return a map between Bookings and their associated on-campus PIDs"""
-        try:
-            # TODO: Write this method
-            pass
+            q = f"""SELECT (pid, firstName, lastName)
+            FROM pids
+            WHERE bookingId={booking.id}"""
+            pids = self._cur.execute(q).fetchall()
+            return [PID(p[0], p[1], p[2]) for p in pids]
         except Exception as e:
             self._logger.error(f"Error fetching new on-campus PIDs: {e}")
             return []
@@ -171,8 +165,8 @@ class Database(metaclass=Singleton):
         """Returns all Employees that are marked as admins"""
         try:
             q = """SELECT (firstName, lastName, slackID)
-                    FROM employees 
-                    WHERE isAdmin=1"""
+                FROM employees 
+                WHERE isAdmin=1"""
             res = self._cur.execute(q).fetchall()
             return [Employee(r[0], r[1], r[2]) for r in res]
         except Exception as e:
@@ -180,40 +174,41 @@ class Database(metaclass=Singleton):
             return []
 
     @_ttl
-    def get_employee(self, id: int) -> Employee:
-        """Returns the employee matching the given id"""
+    def get_slack_id(self, employee_id: int) -> str:
+        """Returns the Slack ID of the employee matching the given id"""
         try:
-            q = f"""SELECT (firstName, lastName, slackID)
-            FROM employees
-            WHERE id={id}"""
-            res = self._cur.execute(q).fetchone()
-            return Employee(res[0], res[1], res[2])
+            q = f"""SELECT slackID
+                FROM employees
+                WHERE id={employee_id}"""
+            return self._cur.execute(q).fetchone()[0]
         except Exception as e:
-            self._logger.error(f"Error when getting Employee object for id {id}: {e}")
-            return None
+            self._logger.error(f"Error when getting Slack ID for {employee_id}: {e}")
+            return ""
 
-    # Is this even necessary? There's no real reason to hold PIDs after admins have been notified.
-    # TODO: Consider replacing this with a DELETE query and removing the adminNotified field.
     @_ttl
-    def mark_pid_notified(self, pid: PID):
+    def remove_pid(self, pid: PID):
         try:
-            q = f"UPDATE pids SET adminNotified=1 WHERE pid={pid.id}"
+            q = f"DELETE FROM pids WHERE pid={pid.id}"
             self._cur.execute(q)
             self._conn.commit()
         except Exception as e:
-            self._logger.error(f"Error when updating record for PID {pid}: {e}")
+            self._logger.error(f"Error when removing record for PID {pid}: {e}")
 
     @_ttl
-    def get_upcoming_bookings(self, delta: timedelta) -> list[Booking]:
+    def get_upcoming_bookings(
+        self, delta: timedelta = timedelta(weeks=1)
+    ) -> list[Booking]:
         """Uses the local database to return all Bookings scheduled between now and (now + delta)"""
         try:
             t = time.time()
-            # TODO: Fill in appropriate fields once Booking class fields have been decided
-            q = f"""SELECT (fields)
-            FROM bookings
-            WHERE startTime BETWEEN {t} AND {t+delta}"""
-            res = self._cur.execute(q).fetchall()
-            return [Booking(r[0]) for r in res]
+            q = f"""SELECT (id, timestamp)
+                FROM bookings
+                WHERE timestamp BETWEEN {t} AND {t+delta}"""
+            bookings = self._cur.execute(q).fetchall()
+            return [
+                Booking(b[0], datetime.fromtimestamp(b[1]), self.get_on_campus_pids(b))
+                for b in bookings
+            ]
         except Exception as e:
             self._logger.error(f"Error when fetching upcoming bookings: {e}")
             return []
