@@ -22,7 +22,19 @@ class TestBooking(ut.TestCase):
 
 
 class TestEmployee(ut.TestCase):
-    pass
+    def test_valid_employee(self):
+        employee = Employee("Foo", "Bar", 123456789)
+        self.assertEqual(employee.first_name, "Foo")
+        self.assertEqual(employee.last_name, "Bar")
+        self.assertEqual(employee.employee_id, 123456789)
+
+    def test_invalid_employee(self):
+        with self.assertRaises(ValueError):
+            Employee("", "Bar", 123456789)
+        with self.assertRaises(ValueError):
+            Employee("Foo", "", 123456789)
+        with self.assertRaises(ValueError):
+            Employee("Foo", "Bar", -1)
 
 
 class TestEvent(ut.TestCase):
@@ -32,9 +44,9 @@ class TestEvent(ut.TestCase):
 class TestPID(ut.TestCase):
     def test_valid_pid(self):
         pid = PID(123456789, "Foo", "Bar")
-        self.assertEquals(pid.id, 123456789)
-        self.assertEquals(pid.first_name, "Foo")
-        self.assertEquals(pid.last_name, "Bar")
+        self.assertEqual(pid.id, 123456789)
+        self.assertEqual(pid.first_name, "Foo")
+        self.assertEqual(pid.last_name, "Bar")
 
     def test_invalid_pid(self):
         with self.assertRaises(ValueError):
