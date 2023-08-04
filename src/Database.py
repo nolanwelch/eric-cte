@@ -28,9 +28,11 @@ class Database(metaclass=Singleton):
         bookeo_api_key: str,
     ):
         if not os.path.exists(db_filepath):
-            raise Exception("Database filepath not found")
+            raise OSError("Database filepath not found")
         elif not os.path.exists(roster_filepath):
-            raise Exception("Roster filepath not found")
+            raise OSError("Roster filepath not found")
+        elif "" in (bookeo_api_key, bookeo_secret_key):
+            raise ValueError("Bookeo keys cannot be empty")
         try:
             self._conn: sqlite3.Connection = sqlite3.connect(db_filepath)
             self._cur: sqlite3.Cursor = self._conn.cursor
