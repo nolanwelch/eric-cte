@@ -6,25 +6,25 @@ import unittest as ut
 
 class TestSecrets(ut.TestCase):
     def test_valid_secrets_path(self):
-        from src.app import get_secrets
+        from app import get_secrets
 
-        secrets = get_secrets("config.env")
+        secrets = get_secrets("test/config.env")
         self.assertIsInstance(secrets, dict)
 
     def test_invalid_secrets_path(self):
-        from src.app import get_secrets
+        from app import get_secrets
 
         with self.assertRaises(OSError):
-            get_secrets("invalidpath")
+            get_secrets("test/invalidpath")
 
     def test_valid_secrets_values(self):
-        from src.app import validate_secrets
+        from app import validate_secrets
 
         validate_secrets({"foo": "bar", "test": "case"}, ["foo", "test"])
         validate_secrets({"foo": "bar", "test": "case"}, ["foo"])
 
     def test_invalid_secrets_values(self):
-        from src.app import validate_secrets
+        from app import validate_secrets
 
         with self.assertRaises(KeyError):
             validate_secrets({"foo": "bar"}, ["foo", "test"])
@@ -36,7 +36,7 @@ class TestBooking(ut.TestCase):
     def test_valid_init(self):
         from datetime import datetime
 
-        from src.Booking import Booking
+        from Booking import Booking
 
         now = datetime.now()
         booking = Booking(123456789, now, [])
@@ -47,7 +47,7 @@ class TestBooking(ut.TestCase):
     def test_invalid_init(self):
         from datetime import datetime
 
-        from src.Booking import Booking
+        from Booking import Booking
 
         now = datetime.now()
         with self.assertRaises(ValueError):
@@ -58,7 +58,7 @@ class TestBooking(ut.TestCase):
 
 class TestEmployee(ut.TestCase):
     def test_valid_init(self):
-        from src.Employee import Employee
+        from Employee import Employee
 
         employee = Employee("Foo", "Bar", 123456789)
         self.assertEqual(employee.first_name, "Foo")
@@ -66,7 +66,7 @@ class TestEmployee(ut.TestCase):
         self.assertEqual(employee.employee_id, 123456789)
 
     def test_invalid_init(self):
-        from src.Employee import Employee
+        from Employee import Employee
 
         with self.assertRaises(ValueError):
             Employee("", "Bar", 123456789)
@@ -82,7 +82,7 @@ class TestEvent(ut.TestCase):
 
 class TestPID(ut.TestCase):
     def test_valid_init(self):
-        from src.PID import PID
+        from PID import PID
 
         pid = PID(123456789, "Foo", "Bar")
         self.assertEqual(pid.id, 123456789)
@@ -90,7 +90,7 @@ class TestPID(ut.TestCase):
         self.assertEqual(pid.last_name, "Bar")
 
     def test_invalid_init(self):
-        from src.PID import PID
+        from PID import PID
 
         with self.assertRaises(ValueError):
             PID(-1, "Foo", "Bar")
@@ -102,7 +102,7 @@ class TestPID(ut.TestCase):
 
 class TestSingleton(ut.TestCase):
     def test_unique_instance(self):
-        from src.Singleton import Singleton
+        from Singleton import Singleton
 
         class TestClass(metaclass=Singleton):
             pass
@@ -116,9 +116,9 @@ class TestDatabase(ut.TestCase):
     def test_valid_init(self):
         import logging
 
-        from src.app import get_secrets, validate_secrets
-        from src.Database import Database
-        from src.Secrets import secret_keys
+        from app import get_secrets, validate_secrets
+        from Database import Database
+        from Secrets import secret_keys
 
         logger = logging.Logger("test", logging.INFO)
         s = get_secrets("config.env")
@@ -128,13 +128,13 @@ class TestDatabase(ut.TestCase):
         self.assertIs(db._logger, logger)
         self.assertEqual(db._bookeo_api_key, "X")
         self.assertEqual(db._bookeo_secret_key, "X")
-        self.assertEqual(db._db_filepath, "data/cte.sqlite3")
-        self.assertEqual(db._roster_filepath, "data/roster.csv")
+        self.assertEqual(db._db_filepath, "test.sqlite3")
+        self.assertEqual(db._roster_filepath, "testroster.csv")
 
     def test_invalid_init(self):
         from logging import Logger
 
-        from src.Database import Database
+        from Database import Database
 
         logger = Logger("test")
 
@@ -158,5 +158,4 @@ class TestSlingApp(ut.TestCase):
 
 if __name__ == "__main__":
     os.chdir(os.path.dirname(os.path.realpath(__file__)))
-    os.chdir("..")
     ut.main()
