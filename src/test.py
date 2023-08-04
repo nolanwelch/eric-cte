@@ -9,6 +9,7 @@ from Event import Event
 from PID import PID
 from SlackApp import SlackApp
 from SlingApp import SlingApp
+from datetime import datetime
 
 # https://machinelearningmastery.com/a-gentle-introduction-to-unit-testing-in-python/
 
@@ -18,7 +19,19 @@ class TestSecrets(ut.TestCase):
 
 
 class TestBooking(ut.TestCase):
-    pass
+    def test_valid_booking(self):
+        now = datetime.now()
+        booking = Booking(123456789, now, [])
+        self.assertEqual(booking.id, 123456789)
+        self.assertEqual(booking.start_datetime, now)
+        self.assertEqual(booking.on_campus_pids, [])
+
+    def test_invalid_booking(self):
+        now = datetime.now()
+        with self.assertRaises(ValueError):
+            Booking(-1, now, [])
+        with self.assertRaises(TypeError):
+            Booking(123456789, None, [])
 
 
 class TestEmployee(ut.TestCase):
