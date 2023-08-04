@@ -1,6 +1,14 @@
+import os
 import unittest as ut
 
-import app as a
+from app import get_secrets, validate_secrets
+from Booking import Booking
+from Database import Database
+from Employee import Employee
+from Event import Event
+from PID import PID
+from SlackApp import SlackApp
+from SlingApp import SlingApp
 
 # https://machinelearningmastery.com/a-gentle-introduction-to-unit-testing-in-python/
 
@@ -22,7 +30,19 @@ class TestEvent(ut.TestCase):
 
 
 class TestPID(ut.TestCase):
-    pass
+    def test_valid_pid(self):
+        pid = PID(123456789, "Foo", "Bar")
+        self.assertEquals(pid.id, 123456789)
+        self.assertEquals(pid.first_name, "Foo")
+        self.assertEquals(pid.last_name, "Bar")
+
+    def test_invalid_pid(self):
+        with self.assertRaises(ValueError):
+            PID(-1, "Foo", "Bar")
+        with self.assertRaises(ValueError):
+            PID(123456789, "", "Bar")
+        with self.assertRaises(ValueError):
+            PID(123456789, "Foo", "")
 
 
 class TestSingleton(ut.TestCase):
@@ -50,6 +70,6 @@ class TestSlingApp(ut.TestCase):
 
 
 if __name__ == "__main__":
-    a.os.chdir(a.os.path.dirname(a.os.path.realpath(__file__)))
-    a.os.chdir("..")
+    os.chdir(os.path.dirname(os.path.realpath(__file__)))
+    os.chdir("..")
     ut.main()
