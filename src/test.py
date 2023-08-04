@@ -1,6 +1,7 @@
 import unittest as ut
 
 import app as a
+from Singleton import Singleton
 
 # https://machinelearningmastery.com/a-gentle-introduction-to-unit-testing-in-python/
 
@@ -26,7 +27,13 @@ class TestPID(ut.TestCase):
 
 
 class TestSingleton(ut.TestCase):
-    pass
+    def test_unique_instance(self):
+        class TestClass(metaclass=Singleton):
+            pass
+
+        instance_1 = TestClass()
+        instance_2 = TestClass()
+        self.assertIs(instance_1, instance_2)
 
 
 class TestDatabase(ut.TestCase):
