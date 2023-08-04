@@ -15,7 +15,29 @@ from datetime import datetime
 
 
 class TestSecrets(ut.TestCase):
-    pass
+    def test_valid_secrets_path(self):
+        secrets = get_secrets("config.env")
+        self.assertIsInstance(secrets, dict)
+
+    def test_invalid_secrets_path(self):
+        with self.assertRaises(OSError):
+            get_secrets("invalidpath")
+
+    def test_valid_secrets_values(self):
+        try:
+            validate_secrets({"foo": "bar", "test": "case"}, ["foo", "test"])
+        except Exception as e:
+            self.fail(f"validate_secrets raised {e} for a valid input")
+        try:
+            validate_secrets({"foo": "bar", "test": "case"}, ["foo"])
+        except Exception as e:
+            self.fail(f"validate_secrets raised {e} for input with extra dict pairs")
+
+    def test_invalid_secrets_values(self):
+        with self.assertRaises(KeyError):
+            validate_secrets({"foo": "bar"}, ["foo", "test"])
+        with self.assertRaises(ValueError):
+            validate_secrets({"foo": "bar", "test": ""}, ["foo", "test"])
 
 
 class TestBooking(ut.TestCase):
