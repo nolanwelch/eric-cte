@@ -18,6 +18,7 @@ CLEAR_DELAY_SECS = 86_400  # 24 hrs
 class Database(metaclass=Singleton):
     ZULU_FORMAT = r"%Y-%m-%dT%H:%M:00Z"
     ON_CAMPUS_CATEGORY_IDS = ["MPJWRE", "PJNEYX"]
+    DB_TABLES = ["employees", "bookings", "pids"]
 
     def __init__(
         self,
@@ -33,19 +34,34 @@ class Database(metaclass=Singleton):
             raise OSError("Roster filepath not found")
         elif "" in (bookeo_api_key, bookeo_secret_key):
             raise ValueError("Bookeo keys cannot be empty")
+        elif os.path.getsize(db_filepath) < 100:
+            raise IOError("Database file too small to be a SQLite file")
+        with open(db_filepath, "rb") as f:
+            if f.read(100)[:16].decode() != "SQLite format 3\x00":
+                raise IOError("Database file is not a SQLite file")
+
         try:
             self._conn: sqlite3.Connection = sqlite3.connect(db_filepath)
-            self._cur: sqlite3.Cursor = self._conn.cursor
+            self._cur: sqlite3.Cursor = self._conn.cursor()
             self._logger = logger
-            self._logger.info("Successfully connected to SQL database")
-            self._db_filepath = db_filepath
-            self._roster_filepath = roster_filepath
-            self._bookeo_secret_key = bookeo_secret_key
-            self._bookeo_api_key = bookeo_api_key
-            self._last_fetch = -1
-            self._last_clear = -1
+            self._logger.info("Successfully connected to SQLite database")
         except:
-            raise Exception("SQLite connection unsuccessful")
+            raise IOError("SQLite connection unsuccessful")
+
+        for table in self.DB_TABLES:
+            if not self._cur.execute(
+                f"""SELECT tbl_name
+                FROM sqlite_master
+                WHERE type='table'AND tbl_name='{table}'"""
+            ).fetchall():
+                raise IOError(f"Table {table} not found in {db_filepath}")
+
+        self._db_filepath = db_filepath
+        self._roster_filepath = roster_filepath
+        self._bookeo_secret_key = bookeo_secret_key
+        self._bookeo_api_key = bookeo_api_key
+        self._last_fetch = -1
+        self._last_clear = -1
 
     def _ttl(func):
         """Decorator to check whether the database should be
