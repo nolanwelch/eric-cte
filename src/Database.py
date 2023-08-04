@@ -97,7 +97,7 @@ class Database(metaclass=Singleton):
             self._logger.info(f"Fetched {len(data)} booking(s) from Bookeo")
 
             for b in data:
-                booking_id = {int(b["bookingNumber"])}
+                bookingid = {int(b["bookingNumber"])}
                 on_campus_pids = [
                     PID(
                         self._extract_pid_from_custom_fields(
@@ -110,11 +110,11 @@ class Database(metaclass=Singleton):
                     if p["peopleCategoryId"] in self.ON_CAMPUS_CATEGORY_IDS
                 ]
                 q = f"""INSERT INTO bookings (id, timestamp)
-                SELECT ({booking_id}, {datetime.fromisoformat(b["startTime"]).astimezone(timezone.utc)})
-                WHERE NOT EXISTS
-                    (SELECT id
-                    FROM bookings
-                    WHERE id={booking_id})"""
+                    SELECT ({bookingid}, {datetime.fromisoformat(b["startTime"]).astimezone(timezone.utc)})
+                    WHERE NOT EXISTS
+                        (SELECT id
+                        FROM bookings
+                        WHERE id={bookingid})"""
                 self._cur.execute(q)
 
                 q = f"""INSERT INTO pids (pid, firstName, lastName, bookingID)
@@ -122,7 +122,7 @@ class Database(metaclass=Singleton):
                 self._cur.executemany(
                     q,
                     [
-                        (p.id, p.first_name, p.last_name, booking_id)
+                        (p.id, p.first_name, p.last_name, bookingid)
                         for p in on_campus_pids
                     ],
                 )
@@ -154,6 +154,7 @@ class Database(metaclass=Singleton):
             return []
 
     def is_on_campus_student(self, pid: PID) -> bool:
+        """Checks if the given PID is in the list of on-campus students"""
         try:
             with open(self._roster_filepath, "r") as f:
                 for row in DictReader(f):
@@ -178,19 +179,20 @@ class Database(metaclass=Singleton):
             return []
 
     @_ttl
-    def get_slack_id(self, employee_id: int) -> str:
-        """Returns the Slack ID of the employee matching the given id"""
+    def get_slackid(self, slingid: int) -> str:
+        """Returns the Slack ID of the employee matching the given Sling ID"""
         try:
             q = f"""SELECT slackID
                 FROM employees
-                WHERE id={employee_id}"""
+                WHERE slingId={slingid}"""
             return self._cur.execute(q).fetchone()[0]
         except Exception as e:
-            self._logger.error(f"Error when getting Slack ID for {employee_id}: {e}")
+            self._logger.error(f"Error when getting Slack ID for {slingid}: {e}")
             return ""
 
     @_ttl
     def remove_pid(self, pid: PID):
+        """Remove the given PID from the local database"""
         try:
             q = f"DELETE FROM pids WHERE pid={pid.id}"
             self._cur.execute(q)
