@@ -50,6 +50,8 @@ class TestBooking(ut.TestCase):
             Booking(-1, now, [])
         with self.assertRaises(TypeError):
             Booking(123456789, None, [])
+        with self.assertRaises(TypeError):
+            Booking(123456789, 200, [])
 
 
 # Tests done!
