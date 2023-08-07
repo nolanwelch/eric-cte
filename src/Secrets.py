@@ -4,9 +4,7 @@ secret_keys = [
     "CAMPUS_ROSTER_PATH",
     "CTE_DB_PATH",
     "SLACK_BOT_TOKEN",
-    "SLACK_SIGNING_SECRET",
     "SLING_USERNAME",
     "SLING_PASSWORD",
-    "MSG_QUEUE_PATH",
     "LOG_PATH",
 ]
