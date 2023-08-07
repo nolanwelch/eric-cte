@@ -8,7 +8,7 @@ class Booking:
         self,
         id: int,
         start_datetime: datetime,
-        on_campus_pids: list[PID],
+        on_campus_pids: set[PID],
     ):
         if id < 0:
             raise ValueError("Booking ID cannot be negative")
