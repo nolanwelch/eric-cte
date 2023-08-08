@@ -74,9 +74,7 @@ class SlingApp:
             headers={"Authorization": self._token},
         )
         if res.status_code != 200:
-            self._logger.warning(
-                f"Could not fetch info for user {employee_id} (status code {res.status_code})"
-            )
+            self._logger.warning(f"User {employee_id} not found")
             return None
         self._logger.info(f"Got info for user {employee_id}")
         e = res.json()
