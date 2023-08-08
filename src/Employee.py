@@ -7,3 +7,6 @@ class Employee:
         self.first_name = first_name
         self.last_name = last_name
         self.employee_id = employee_id
+
+    def __eq__(self, other):
+        return isinstance(other, Employee) and other.employee_id == self.employee_id

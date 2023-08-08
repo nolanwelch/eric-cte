@@ -17,3 +17,6 @@ class Booking:
         self.id = id
         self.start_datetime = start_datetime
         self.on_campus_pids = on_campus_pids
+
+    def __eq__(self, other):
+        return isinstance(other, Booking) and other.id == self.id
