@@ -4,6 +4,9 @@ roster.csv
 cte.sqlite3
 testroster.csv
 test.sqlite3
+invalidfile
+invalidheader
+invalid.sqlite3
 
 # Developer keys
 config.env
