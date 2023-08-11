@@ -772,8 +772,44 @@ class TestSlingApp(ut.TestCase):
 def setup_db(filepath: str):
     import sqlite3
 
+    if not os.path.exists(filepath):
+        open(filepath, "a").close()
+
     conn = sqlite3.connect(filepath)
     cur = conn.cursor()
+
+    cur.execute(
+        """CREATE TABLE IF NOT EXISTS "bookings" (
+                "id" INTEGER NOT NULL UNIQUE,
+                "timestamp" REAL NOT NULL,
+                "msgChannelID" TEXT,
+                "msgTimestamp" REAL,
+                "msgText" TEXT,
+                "employeeNotified" INTEGER DEFAULT 0,
+                "lastChange" REAL NOT NULL,
+                PRIMARY KEY("id")
+                )"""
+    )
+    cur.execute(
+        """CREATE TABLE IF NOT EXISTS "employees" (
+	        "firstName"	TEXT NOT NULL,
+        	"lastName"	TEXT NOT NULL,
+        	"id" INTEGER NOT NULL UNIQUE,
+        	"slackID" TEXT UNIQUE,
+        	"isAdmin" INTEGER NOT NULL,
+        	PRIMARY KEY("id")
+            )"""
+    )
+    cur.execute(
+        """CREATE TABLE IF NOT EXISTS "pids" (
+            "pid" INTEGER NOT NULL,
+            "firstName"	TEXT NOT NULL,
+            "lastName" TEXT NOT NULL,
+            "bookingID"	INTEGER NOT NULL,
+            PRIMARY KEY("pid")
+            )"""
+    )
+
     cur.execute("DELETE FROM employees")
     cur.execute("DELETE FROM pids")
     cur.execute("DELETE FROM bookings")
@@ -786,9 +822,20 @@ def setup_db(filepath: str):
     conn.commit()
 
 
+def setup_roster(filepath: str):
+    from csv import DictWriter
+
+    with open(filepath, "w") as f:
+        fields = ["lastName", "firstName", "PID"]
+        writer = DictWriter(f, fieldnames=fields)
+        writer.writeheader()
+        writer.writerow({"lastName": "Welch", "firstName": "Nolan", "PID": 17})
+
+
 if __name__ == "__main__":
     os.chdir(os.path.dirname(os.path.realpath(__file__)))
     sys.path.append("..")
     send_messages = False
     setup_db("test.sqlite3")
+    setup_roster("testroster.csv")
     ut.main()

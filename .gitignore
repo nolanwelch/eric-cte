@@ -1,7 +1,9 @@
-# Program files
+# Program and test files
 msg_queue.json
 roster.csv
 cte.sqlite3
+testroster.csv
+test.sqlite3
 
 # Developer keys
 config.env
