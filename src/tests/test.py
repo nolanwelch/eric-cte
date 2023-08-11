@@ -832,10 +832,46 @@ def setup_roster(filepath: str):
         writer.writerow({"lastName": "Welch", "firstName": "Nolan", "PID": 17})
 
 
+def setup_invalid_files():
+    import sqlite3
+
+    with open("invalidfile", "w") as f:
+        f.write("E")
+
+    with open("invalidheader", "w") as f:
+        f.write(
+            "Lorem ipsum dolor sit amet,\ consectetur adipiscing elit,\
+                  sed do eiusmod tempor incididunt ut labore\
+                      et dolore magna aliqua"
+        )
+
+    db_path = "invalid.sqlite3"
+    if not os.path.exists(db_path):
+        open(db_path, "a").close()
+
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+
+    cur.execute(
+        """CREATE TABLE IF NOT EXISTS "bookings" (
+	    "id" INTEGER,
+    	PRIMARY KEY("id")
+        )"""
+    )
+    cur.execute(
+        """CREATE TABLE "employees" (
+    	"id" INTEGER,
+    	PRIMARY KEY("id")
+        )"""
+    )
+    conn.commit()
+
+
 if __name__ == "__main__":
     os.chdir(os.path.dirname(os.path.realpath(__file__)))
     sys.path.append("..")
     send_messages = False
     setup_db("test.sqlite3")
     setup_roster("testroster.csv")
+    setup_invalid_files()
     ut.main()
