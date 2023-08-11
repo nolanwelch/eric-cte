@@ -1,4 +1,3 @@
-import logging
 import os
 import sys
 import unittest as ut
@@ -250,27 +249,27 @@ class TestDatabase(ut.TestCase):
             s["BOOKEO_SECRET_KEY"],
             s["BOOKEO_API_KEY"],
         )
-        pids = {1, 2, 3, 4, 5}
-        pids = {PID(x, "Foo", "Bar") for x in pids}
-        b = Booking(1, datetime(2023, 7, 23, 12, 0), pids)
-        timestamp = b.start_datetime.replace(tzinfo=timezone.utc).timestamp()
-        timestamp = int(timestamp)
-        # TODO: FIgure out how to convert a datetime object to a Unix timestamp. Will need to include timezone info. God I'm getting a headache
-        # print(f"INSERT INTO bookings (id, timestamp) VALUES ({b.id}, {timestamp})")
-        return
+        pids = [1, 2, 3, 4, 5]
+        pids = [PID(x, "Foo", "Bar") for x in pids]
+        b = Booking(1, datetime(2023, 7, 23, 12, 0).astimezone(timezone.utc), pids)
+
+        q = """INSERT INTO bookings (id, timestamp, lastChange)
+            VALUES (?, ?, ?)"""
+
         db._cur.execute(
-            f"""INSERT INTO bookings (id, timestamp)
-                VALUES ({b.id}, {b.start_datetime.astimezone(timezone.utc)})"""
+            q, (b.id, b.start_datetime.timestamp(), datetime.now().timestamp())
         )
+
         db._cur.executemany(
             f"""INSERT INTO pids (pid, firstName, lastName, bookingID)
-                VALUES (? ? ? {b.id})""",
-            [(p.id, p.first_name, p.last_name) for p in pids],
+                VALUES (?, ?, ?, ?)""",
+            [(p.id, p.first_name, p.last_name, b.id) for p in pids],
         )
         db._conn.commit()
+
         db_pids = db.get_on_campus_pids(b)
-        db._cur.execute(f"DELETE FROM bookings WHERE id={b.id}")
-        db._cur.execute(f"DELETE FROM pids WHERE bookingID={b.id}")
+        db._cur.execute("DELETE FROM bookings WHERE id=?", (b.id,))
+        db._cur.execute("DELETE FROM pids WHERE bookingID=?", (b.id,))
         db._conn.commit()
         self.assertEqual(db_pids, pids)
 
@@ -303,7 +302,54 @@ class TestDatabase(ut.TestCase):
         from logging import INFO, Logger
 
         from app import get_secrets, validate_secrets
-        from Booking import Booking
+        from Database import Database
+        from Secrets import secret_keys
+
+        logger = Logger("test", level=INFO)
+        s = get_secrets("config.env")
+        validate_secrets(s, secret_keys)
+
+        db = Database(
+            logger,
+            s["CTE_DB_PATH"],
+            s["CAMPUS_ROSTER_PATH"],
+            s["BOOKEO_SECRET_KEY"],
+            s["BOOKEO_API_KEY"],
+        )
+
+        admins = db.get_admins()
+        self.assertEqual(len(admins), 1)
+        admin = admins[0]
+        self.assertEqual(admin.first_name, "Nolan")
+        self.assertEqual(admin.last_name, "Welch")
+        self.assertEqual(admin.employee_id, 13051138)
+
+    def test_get_slack_id(self):
+        from logging import INFO, Logger
+
+        from app import get_secrets, validate_secrets
+        from Database import Database
+        from Secrets import secret_keys
+
+        logger = Logger("test", level=INFO)
+        s = get_secrets("config.env")
+        validate_secrets(s, secret_keys)
+
+        db = Database(
+            logger,
+            s["CTE_DB_PATH"],
+            s["CAMPUS_ROSTER_PATH"],
+            s["BOOKEO_SECRET_KEY"],
+            s["BOOKEO_API_KEY"],
+        )
+
+        self.assertEqual(db.get_slack_id(13051138), "U04LJEPH7GT")
+        self.assertEqual(db.get_slack_id(-1), "")
+
+    def test_remove_pid(self):
+        from logging import INFO, Logger
+
+        from app import get_secrets, validate_secrets
         from Database import Database
         from PID import PID
         from Secrets import secret_keys
@@ -320,14 +366,73 @@ class TestDatabase(ut.TestCase):
             s["BOOKEO_API_KEY"],
         )
 
-    def test_get_slack_id(self):
-        pass
+        pid_1 = PID(17, "foo", "bar")
+        pid_2 = PID(29, "lorem", "ipsum")
 
-    def test_remove_pid(self):
-        pass
+        q = """INSERT INTO pids (firstName, lastName, pid, bookingID)
+        VALUES (?, ?, ?, ?)"""
+        db._cur.execute(q, (pid_1.first_name, pid_1.last_name, pid_1.id, 1))
+        db._cur.execute(q, (pid_2.first_name, pid_2.last_name, pid_2.id, 2))
+        db._conn.commit()
+
+        db.remove_pid(pid_1)
+
+        q = """SELECT firstName, lastName, pid
+        FROM pids
+        WHERE pid=?"""
+        res = db._cur.execute(q, (pid_1.id,)).fetchone()
+        self.assertIsNone(res)
+        res = db._cur.execute(q, (pid_2.id,)).fetchone()
+        self.assertEqual(res[0], pid_2.first_name)
+        self.assertEqual(res[1], pid_2.last_name)
+        self.assertEqual(res[2], pid_2.id)
+
+        q = """DELETE FROM pids
+        WHERE pid=?"""
+        db._cur.execute(q, (pid_2.id,))
+        db._conn.commit()
 
     def test_get_upcoming_bookings(self):
-        pass
+        from datetime import datetime, timedelta, timezone
+        from logging import INFO, Logger
+
+        from app import get_secrets, validate_secrets
+        from Database import Database
+        from Secrets import secret_keys
+
+        logger = Logger("test", level=INFO)
+        s = get_secrets("config.env")
+        validate_secrets(s, secret_keys)
+
+        db = Database(
+            logger,
+            s["CTE_DB_PATH"],
+            s["CAMPUS_ROSTER_PATH"],
+            s["BOOKEO_SECRET_KEY"],
+            s["BOOKEO_API_KEY"],
+        )
+
+        now = datetime.now()
+        dt = now + timedelta(days=2)
+        dt = dt.astimezone(timezone.utc)
+
+        q = """INSERT INTO bookings (id, timestamp, lastChange)
+        VALUES (?, ?, ?)"""
+        db._cur.execute(q, (1967, dt.timestamp(), now))
+        db._conn.commit()
+
+        b_1 = db.get_upcoming_bookings(timedelta(days=3))
+        b_2 = db.get_upcoming_bookings(timedelta(days=1))
+
+        q = """DELETE FROM bookings
+        WHERE id=?"""
+        db._cur.execute(q, (1967,))
+        db._conn.commit()
+
+        self.assertEqual(len(b_1), 1)
+        self.assertEqual(b_1[0].id, 1967)
+        self.assertEqual(b_1[0].start_datetime, dt)
+        self.assertEqual(len(b_2), 0)
 
     def test_delete_if_lastchange_stale(self):
         pass
@@ -664,12 +769,26 @@ class TestSlingApp(ut.TestCase):
         self.assertGreater(sling._session_start_time, old_start_time)
 
 
-def test():
-    os.chdir(os.path.dirname(os.path.realpath(__file__)))
-    sys.path.append("..")
-    ut.main()
+def setup_db(filepath: str):
+    import sqlite3
+
+    conn = sqlite3.connect(filepath)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM employees")
+    cur.execute("DELETE FROM pids")
+    cur.execute("DELETE FROM bookings")
+    conn.commit()
+
+    cur.execute(
+        """INSERT INTO employees (firstName, lastName, id, slackID, isAdmin)
+                VALUES ("Nolan", "Welch", 13051138, "U04LJEPH7GT", 1)"""
+    )
+    conn.commit()
 
 
 if __name__ == "__main__":
+    os.chdir(os.path.dirname(os.path.realpath(__file__)))
+    sys.path.append("..")
     send_messages = False
-    test()
+    setup_db("test.sqlite3")
+    ut.main()
