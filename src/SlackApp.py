@@ -174,3 +174,22 @@ class SlackApp:
         except Exception as e:
             self._logger.error(f"Error updating Message timestamp: {e}")
             return message
+
+    def delete_message(self, message: Message):
+        try:
+            if message is None:
+                return
+            result = requests.post(
+                "https://slack.com/api/chat.delete",
+                params={
+                    "channel": message.resolved_channel_id,
+                    "ts": message.timestamp.timestamp(),
+                },
+                headers={"Authorization": f"Bearer {self._token}"},
+            )
+            if result.status_code == 200 and result.json()["ok"]:
+                self._logger.info("Deleted message from Slack")
+            else:
+                self._logger.warning("Could not delete message from Slack")
+        except Exception as e:
+            self._logger.error(f"Error deleting message: {e}")
