@@ -859,7 +859,7 @@ def setup_invalid_files():
         )"""
     )
     cur.execute(
-        """CREATE TABLE "employees" (
+        """CREATE TABLE IF NOT EXISTS "employees" (
     	"id" INTEGER,
     	PRIMARY KEY("id")
         )"""
