@@ -1,5 +1,4 @@
-# Program and test files
-msg_queue.json
+# Program / test files
 roster.csv
 cte.sqlite3
 testroster.csv
