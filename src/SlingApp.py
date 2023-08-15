@@ -5,6 +5,7 @@ import requests
 from Employee import Employee
 
 SLING_TTL = timedelta(days=1)
+USERAGENT = "ERIC-CTE v1.0"
 
 
 class SlingApp:
@@ -13,6 +14,7 @@ class SlingApp:
         res = requests.post(
             "https://api.getsling.com/account/login",
             json={"email": username, "password": password},
+            headers={"User-Agent": USERAGENT},
         )
         if res.status_code == 200:
             self._logger = logger
@@ -26,7 +28,7 @@ class SlingApp:
         t = datetime.now()
         res = requests.post(
             "https://api.getsling.com/v1/account/session",
-            headers={"Authorization": self._token},
+            headers={"Authorization": self._token, "User-Agent": USERAGENT},
         )
         if res.status_code == 201:
             self._logger.info("Sling session renewed")
@@ -49,10 +51,11 @@ class SlingApp:
     @_ttl
     def fetch_scheduled_employee(self, start_time: datetime) -> Employee:
         """Returns the Employee object scheduled for the shift beginning at start_time"""
-        start_timestamp = start_time.strftime(r"%Y-%m-%dT%H:%M:00Z")
+        start_timestamp = start_time.astimezone(timezone.utc)
+        start_timestamp = start_timestamp.strftime(r"%Y-%m-%dT%H:%M:00Z")
         res = requests.get(
             "https://api.getsling.com/v1/reports/roster",
-            headers={"Authorization": self._token},
+            headers={"Authorization": self._token, "User-Agent": USERAGENT},
             params={"dates": start_timestamp, "v": 2},
         )
         if res.status_code != 200:
@@ -71,7 +74,7 @@ class SlingApp:
         """Returns the Employee object matching a given user ID"""
         res = requests.get(
             f"https://api.getsling.com/v1/users/{employee_id}",
-            headers={"Authorization": self._token},
+            headers={"Authorization": self._token, "User-Agent": USERAGENT},
         )
         if res.status_code != 200:
             self._logger.warning(f"User {employee_id} not found")
