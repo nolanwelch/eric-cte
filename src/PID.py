@@ -9,4 +9,8 @@ class PID:
         self.last_name = last_name
 
     def __eq__(self, other):
-        return isinstance(other, PID) and other.id == self.id
+        return (
+            isinstance(other, PID)
+            and other.id == self.id
+            and other.last_name == self.last_name
+        )
