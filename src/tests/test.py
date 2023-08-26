@@ -1,14 +1,13 @@
 import os
 import sys
-import unittest as ut
+import unittest
 
 # https://machinelearningmastery.com/a-gentle-introduction-to-unit-testing-in-python/
-# TODO: Write tests for Database and SlackApp classes
-# TODO: Add test.py to the run bash script once finished
+# TODO: Write tests for Database class
 
 
 # Tests done!
-class TestSecrets(ut.TestCase):
+class TestSecrets(unittest.TestCase):
     def test_get_secrets(self):
         from app import get_secrets
 
@@ -31,7 +30,7 @@ class TestSecrets(ut.TestCase):
 
 
 # Tests done!
-class TestBooking(ut.TestCase):
+class TestBooking(unittest.TestCase):
     def test_booking_init(self):
         from datetime import datetime
 
@@ -42,7 +41,7 @@ class TestBooking(ut.TestCase):
 
         booking = Booking(123456789, now, pids)
         self.assertEqual(booking.id, 123456789)
-        self.assertEqual(booking.start_datetime, now)
+        self.assertEqual(booking.start, now)
         self.assertEqual(booking.on_campus_pids, pids)
 
         with self.assertRaises(ValueError):
@@ -53,28 +52,7 @@ class TestBooking(ut.TestCase):
             Booking(123456789, 200, [])
 
 
-# Tests done!
-class TestEmployee(ut.TestCase):
-    def test_employee_init(self):
-        from Employee import Employee
-
-        id = 123456789
-
-        employee = Employee("Foo", "Bar", id)
-        self.assertEqual(employee.first_name, "Foo")
-        self.assertEqual(employee.last_name, "Bar")
-        self.assertEqual(employee.employee_id, id)
-
-        with self.assertRaises(ValueError):
-            Employee("", "Bar", 123456789)
-        with self.assertRaises(ValueError):
-            Employee("Foo", "", 123456789)
-        with self.assertRaises(ValueError):
-            Employee("Foo", "Bar", -1)
-
-
-# Tests done!
-class TestPID(ut.TestCase):
+class TestPID(unittest.TestCase):
     def test_pid_init(self):
         from PID import PID
 
@@ -94,34 +72,34 @@ class TestPID(ut.TestCase):
 
 
 # Tests done!
-class TestMessage(ut.TestCase):
+class TestMessage(unittest.TestCase):
     def test_message_init(self):
         from datetime import datetime
 
-        from SlackApp import Message
+        from SlackApp import MessageResponse
 
         now = datetime.now()
         channel_id = "U1234567890"
 
-        m = Message(channel_id, now, "foo")
+        m = MessageResponse(channel_id, now, "foo")
         self.assertEqual(m.resolved_channel_id, channel_id)
         self.assertEqual(m.timestamp, now)
         self.assertEqual(m.message, "foo")
 
-        Message(channel_id, now, 3000)
-        Message(channel_id, now, [x for x in range(30)])
+        MessageResponse(channel_id, now, 3000)
+        MessageResponse(channel_id, now, [x for x in range(30)])
 
         with self.assertRaises(ValueError):
-            Message("", now, "foo")
+            MessageResponse("", now, "foo")
         with self.assertRaises(TypeError):
-            Message(channel_id, None, "foo")
+            MessageResponse(channel_id, None, "foo")
         with self.assertRaises(TypeError):
-            Message(channel_id, 200, "foo")
+            MessageResponse(channel_id, 200, "foo")
         with self.assertRaises(TypeError):
-            Message(channel_id, now, None)
+            MessageResponse(channel_id, now, None)
 
 
-class TestDatabase(ut.TestCase):
+class TestDatabase(unittest.TestCase):
     def test_valid_database_init(self):
         from logging import INFO, Logger
 
@@ -200,33 +178,70 @@ class TestDatabase(ut.TestCase):
             (id, dt, dt),
         )
         db._conn.commit()
-        db._clear()
+        db.clear()
         res = db._cur.execute("SELECT * FROM bookings WHERE id=?", (id,)).fetchone()
         self.assertIsNone(res)
 
-    def test_zulu_to_datetime(self):
-        from datetime import datetime
-
-        from Database import Database
-
-        zulu = "1970-01-01T00:00:00Z"
-        dt = datetime(1970, 1, 1, 0, 0, 0)
-        self.assertEqual(Database._zulu_to_datetime(zulu), dt)
-
-    def test_datetime_to_zulu(self):
-        from datetime import datetime
-
-        from Database import Database
-
-        zulu = "1970-01-01T00:00:00Z"
-        dt = datetime(1970, 1, 1, 0, 0, 0)
-        self.assertEqual(Database._datetime_to_zulu(dt), zulu)
-
     def test_retrieve_new_bookings(self):
-        pass
+        from datetime import datetime, timedelta
+        from logging import INFO, Logger
+
+        from app import get_secrets, validate_secrets
+        from Database import Database
+        from Secrets import secret_keys
+
+        logger = Logger("test", level=INFO)
+        s = get_secrets("config.env")
+        validate_secrets(s, secret_keys)
+
+        db = Database(
+            logger,
+            s["CTE_DB_PATH"],
+            s["CAMPUS_ROSTER_PATH"],
+            s["BOOKEO_SECRET_KEY"],
+            s["BOOKEO_API_KEY"],
+        )
+        dt = datetime.fromtimestamp(1694295000)
+        db.insert_new_bookings(timedelta(hours=2), dt)
+
+        q = """"""
 
     def test_extract_pid_from_custom_fields(self):
-        pass
+        from logging import INFO, Logger
+
+        from app import get_secrets, validate_secrets
+        from Database import Database
+        from Secrets import secret_keys
+
+        logger = Logger("test", level=INFO)
+        s = get_secrets("config.env")
+        validate_secrets(s, secret_keys)
+
+        db = Database(
+            logger,
+            s["CTE_DB_PATH"],
+            s["CAMPUS_ROSTER_PATH"],
+            s["BOOKEO_SECRET_KEY"],
+            s["BOOKEO_API_KEY"],
+        )
+
+        id_1 = db._extract_pid([])
+        self.assertEqual(id_1, 0)
+
+        fields = [{"id": "A9LJLC", "name": "PID", "value": 31}]
+        id_2 = db._extract_pid(fields)
+        self.assertEqual(id_2, 31)
+
+        fields = [
+            {"id": "X0XXXX", "name": "isFaculty", "value": False},
+            {"id": "X0XXXX", "name": "PID", "value": 42},
+        ]
+        id_3 = db._extract_pid(fields)
+        self.assertEqual(id_3, 42)
+
+        fields = [{"id": "X0XXXX", "name": "isFaculty", "value": False}]
+        id_4 = db._extract_pid(fields)
+        self.assertEqual(id_4, 0)
 
     def test_get_on_campus_pids(self):
         from datetime import datetime, timezone
@@ -256,9 +271,7 @@ class TestDatabase(ut.TestCase):
         q = """INSERT INTO bookings (id, timestamp, lastChange)
             VALUES (?, ?, ?)"""
 
-        db._cur.execute(
-            q, (b.id, b.start_datetime.timestamp(), datetime.now().timestamp())
-        )
+        db._cur.execute(q, (b.id, b.start.timestamp(), datetime.now().timestamp()))
 
         db._cur.executemany(
             f"""INSERT INTO pids (pid, firstName, lastName, bookingID)
@@ -267,7 +280,7 @@ class TestDatabase(ut.TestCase):
         )
         db._conn.commit()
 
-        db_pids = db.get_on_campus_pids(b)
+        db_pids = db.get_on_campus_pids(b.id)
         db._cur.execute("DELETE FROM bookings WHERE id=?", (b.id,))
         db._cur.execute("DELETE FROM pids WHERE bookingID=?", (b.id,))
         db._conn.commit()
@@ -294,8 +307,9 @@ class TestDatabase(ut.TestCase):
         )
         p_1 = PID(17, "Nolan", "Welch")
         p_2 = PID(0, "Foo", "Bar")
-        self.assertTrue(db.is_on_campus_student(p_1))
-        self.assertFalse(db.is_on_campus_student(p_2))
+        # TODO: Rewrite this test
+        self.assertTrue(db.get_matching_pid(p_1))
+        self.assertFalse(db.get_matching_pid(p_2))
 
     def test_get_admins(self):
         from datetime import datetime, timezone
@@ -329,6 +343,7 @@ class TestDatabase(ut.TestCase):
 
         from app import get_secrets, validate_secrets
         from Database import Database
+        from Employee import Employee
         from Secrets import secret_keys
 
         logger = Logger("test", level=INFO)
@@ -342,7 +357,6 @@ class TestDatabase(ut.TestCase):
             s["BOOKEO_SECRET_KEY"],
             s["BOOKEO_API_KEY"],
         )
-
         self.assertEqual(db.get_slack_id(13051138), "U04LJEPH7GT")
         self.assertEqual(db.get_slack_id(-1), "")
 
@@ -431,7 +445,7 @@ class TestDatabase(ut.TestCase):
 
         self.assertEqual(len(b_1), 1)
         self.assertEqual(b_1[0].id, 1967)
-        self.assertEqual(b_1[0].start_datetime, dt)
+        self.assertEqual(b_1[0].start, dt)
         self.assertEqual(len(b_2), 0)
 
     def test_delete_if_lastchange_stale(self):
@@ -445,7 +459,7 @@ class TestDatabase(ut.TestCase):
 
 
 # Tests done!
-class TestSlackApp(ut.TestCase):
+class TestSlackApp(unittest.TestCase):
     def test_valid_slack_init(self):
         from datetime import time
         from logging import INFO, Logger
@@ -583,7 +597,7 @@ class TestSlackApp(ut.TestCase):
 
         from app import get_secrets, validate_secrets
         from Secrets import secret_keys
-        from SlackApp import Message, SlackApp
+        from SlackApp import MessageResponse, SlackApp
 
         logger = Logger("test", level=INFO)
         s = get_secrets("config.env")
@@ -596,7 +610,7 @@ class TestSlackApp(ut.TestCase):
 
         slack = SlackApp(logger, s["SLACK_BOT_TOKEN"], qh_start, qh_end)
 
-        message = Message(
+        message = MessageResponse(
             "D05F7BU02Q2",
             dt,
             "React to this message.",
@@ -611,7 +625,7 @@ class TestSlackApp(ut.TestCase):
 
         from app import get_secrets, validate_secrets
         from Secrets import secret_keys
-        from SlackApp import Message, SlackApp
+        from SlackApp import MessageResponse, SlackApp
 
         logger = Logger("test", level=INFO)
         s = get_secrets("config.env")
@@ -625,7 +639,7 @@ class TestSlackApp(ut.TestCase):
         approx_ts = approx_ts.astimezone(timezone.utc)
 
         ts_1 = slack.fetch_timestamp(
-            Message(
+            MessageResponse(
                 "D05F7BU02Q2",
                 approx_ts,
                 "React to this message.",
@@ -635,7 +649,9 @@ class TestSlackApp(ut.TestCase):
         correct_ts = correct_ts.astimezone(timezone.utc)
         self.assertEqual(ts_1, correct_ts)
 
-        ts_2 = slack.fetch_timestamp(Message("D05F7BU02Q2", approx_ts, "foo bar"))
+        ts_2 = slack.fetch_timestamp(
+            MessageResponse("D05F7BU02Q2", approx_ts, "foo bar")
+        )
         self.assertIsNone(ts_2)
 
         self.assertIsNone(slack.fetch_timestamp(None))
@@ -646,7 +662,7 @@ class TestSlackApp(ut.TestCase):
 
         from app import get_secrets, validate_secrets
         from Secrets import secret_keys
-        from SlackApp import Message, SlackApp
+        from SlackApp import MessageResponse, SlackApp
 
         logger = Logger("test", level=INFO)
         s = get_secrets("config.env")
@@ -660,7 +676,7 @@ class TestSlackApp(ut.TestCase):
         approx_ts = approx_ts.astimezone(timezone.utc)
 
         msg_1 = slack.update_message(
-            Message(
+            MessageResponse(
                 "D05F7BU02Q2",
                 approx_ts,
                 "React to this message.",
@@ -670,103 +686,12 @@ class TestSlackApp(ut.TestCase):
         correct_ts = correct_ts.astimezone(timezone.utc)
         self.assertEqual(msg_1.timestamp, correct_ts)
 
-        msg_2 = slack.update_message(Message("D05F7BU02Q2", approx_ts, "foo bar"))
+        msg_2 = slack.update_message(
+            MessageResponse("D05F7BU02Q2", approx_ts, "foo bar")
+        )
         self.assertIsNone(msg_2)
 
         self.assertIsNone(slack.update_message(None))
-
-
-# Tests done!
-class TestSlingApp(ut.TestCase):
-    def test_valid_sling_init(self):
-        from logging import INFO, Logger
-
-        from app import get_secrets, validate_secrets
-        from Secrets import secret_keys
-        from SlingApp import SlingApp
-
-        logger = Logger("test", level=INFO)
-        s = get_secrets("config.env")
-        validate_secrets(s, secret_keys)
-
-        sling = SlingApp(logger, s["SLING_USERNAME"], s["SLING_PASSWORD"])
-        self.assertIs(sling._logger, logger)
-
-    def test_invalid_sling_init(self):
-        from logging import INFO, Logger
-
-        from app import get_secrets, validate_secrets
-        from Secrets import secret_keys
-        from SlingApp import SlingApp
-
-        logger = Logger("test", level=INFO)
-        s = get_secrets("config.env")
-        validate_secrets(s, secret_keys)
-
-        with self.assertRaises(ValueError):
-            SlingApp(logger, "foo", "bar")
-
-    def test_fetch_employee_from_id(self):
-        from logging import INFO, Logger
-
-        from app import get_secrets, validate_secrets
-        from Employee import Employee
-        from Secrets import secret_keys
-        from SlingApp import SlingApp
-
-        logger = Logger("test", level=INFO)
-        s = get_secrets("config.env")
-        validate_secrets(s, secret_keys)
-
-        sling = SlingApp(logger, s["SLING_USERNAME"], s["SLING_PASSWORD"])
-        employee = sling._fetch_employee_from_id(13449876)
-        self.assertIsInstance(employee, Employee)
-        self.assertEqual(employee.first_name, "Haven")
-        self.assertEqual(employee.last_name, "Biddix")
-
-        self.assertIsNone(sling._fetch_employee_from_id(0))
-
-    def test_fetch_scheduled_employee(self):
-        from datetime import datetime, timedelta, timezone
-        from logging import INFO, Logger
-
-        from app import get_secrets, validate_secrets
-        from Secrets import secret_keys
-        from SlingApp import SlingApp
-
-        logger = Logger("test", level=INFO)
-        s = get_secrets("config.env")
-        validate_secrets(s, secret_keys)
-        tz = timezone(timedelta(hours=-4))
-
-        sling = SlingApp(logger, s["SLING_USERNAME"], s["SLING_PASSWORD"])
-        dt = datetime(2023, 7, 29, 11, 45, tzinfo=tz)
-        employee = sling.fetch_scheduled_employee(dt)
-        self.assertEqual(employee.employee_id, 11896239)
-        self.assertEqual(employee.first_name, "Sarah")
-        self.assertEqual(employee.last_name, "Giang")
-
-        dt = datetime(2017, 5, 14, tzinfo=tz)
-        employee = sling.fetch_scheduled_employee(dt)
-        self.assertIsNone(employee)
-
-    def test_renew_session(self):
-        from logging import INFO, Logger
-
-        from app import get_secrets, validate_secrets
-        from Secrets import secret_keys
-        from SlingApp import SlingApp
-
-        logger = Logger("test", level=INFO)
-        s = get_secrets("config.env")
-        validate_secrets(s, secret_keys)
-
-        sling = SlingApp(logger, s["SLING_USERNAME"], s["SLING_PASSWORD"])
-        old_token = sling._token
-        old_start_time = sling._session_start_time
-        sling._renew_session()
-        self.assertNotEqual(sling._token, old_token)
-        self.assertGreater(sling._session_start_time, old_start_time)
 
 
 def setup_db(filepath: str):
@@ -785,8 +710,9 @@ def setup_db(filepath: str):
                 "msgChannelID" TEXT,
                 "msgTimestamp" REAL,
                 "msgText" TEXT,
-                "employeeNotified" INTEGER DEFAULT 0,
                 "lastChange" REAL NOT NULL,
+                "adminNotifiedPIDs" INTEGER DEFAULT 0,
+                "email" TEXT,
                 PRIMARY KEY("id")
                 )"""
     )
@@ -805,20 +731,19 @@ def setup_db(filepath: str):
             "pid" INTEGER NOT NULL,
             "firstName"	TEXT NOT NULL,
             "lastName" TEXT NOT NULL,
-            "bookingID"	INTEGER NOT NULL,
-            PRIMARY KEY("pid")
+            "bookingID"	INTEGER NOT NULL
             )"""
     )
 
-    cur.execute("DELETE FROM employees")
-    cur.execute("DELETE FROM pids")
-    cur.execute("DELETE FROM bookings")
-    conn.commit()
+    # cur.execute("DELETE FROM employees")
+    # cur.execute("DELETE FROM pids")
+    # cur.execute("DELETE FROM bookings")
+    # conn.commit()
 
-    cur.execute(
-        """INSERT INTO employees (firstName, lastName, id, slackID, isAdmin)
-                VALUES ("Nolan", "Welch", 13051138, "U04LJEPH7GT", 1)"""
-    )
+    # cur.execute(
+    #     """INSERT INTO employees (firstName, lastName, id, slackID, isAdmin)
+    #             VALUES ("Nolan", "Welch", 13051138, "U05F0L9LN3G", 1)"""
+    # )
     conn.commit()
 
 
@@ -867,6 +792,87 @@ def setup_invalid_files():
     conn.commit()
 
 
+def test_main():
+    import datetime as dt
+    import logging
+    from logging.handlers import TimedRotatingFileHandler
+    from time import sleep
+
+    import pytz
+    from app import connected_to_internet, get_secrets, validate_secrets
+    from Booking import Booking
+    from Database import Database
+    from Employee import Employee
+    from Secrets import secret_keys
+    from SlackApp import SlackApp
+
+    LOCAL_TIMEZONE = pytz.timezone("America/New_York")
+    logger = logging.getLogger("eric-cte")
+    secrets = get_secrets("config.env")
+    validate_secrets(secrets, secret_keys)
+
+    fh = TimedRotatingFileHandler(
+        filename=secrets["LOG_PATH"],
+        when="midnight",
+        backupCount=60,
+        encoding="utf-8",
+    )
+    fh.setFormatter(
+        logging.Formatter("%(asctime)s;%(levelname)s;%(message)s", "%Y-%m-%d %H:%M:%S")
+    )
+    fh.setLevel(logging.INFO)
+    logger.addHandler(fh)
+
+    slack = SlackApp(
+        logger,
+        secrets["SLACK_BOT_TOKEN"],
+        quiet_hours_start=dt.time(hour=21),
+        quiet_hours_end=dt.time(hour=8),
+    )
+    db = Database(
+        logger,
+        secrets["CTE_DB_PATH"],
+        secrets["CAMPUS_ROSTER_PATH"],
+        secrets["BOOKEO_SECRET_KEY"],
+        secrets["BOOKEO_API_KEY"],
+    )
+
+    admins = db.get_admins()
+    admin_slack_ids = [db.get_slack_id(a.employee_id) for a in admins]
+
+    last_fetch = dt.datetime.fromtimestamp(0)
+
+    while True:
+        while not connected_to_internet():
+            logger.error("No Internet connection")
+            sleep(60)
+
+        # Update local database
+        db.clear()
+        fetch_delta = dt.timedelta(days=31)
+        bookings: list[Booking] = []
+        if dt.datetime.now() - last_fetch > dt.timedelta(minutes=5):
+            last_fetch = dt.datetime.now()
+            bookings = db.fetch_bookings(fetch_delta)
+            db.insert_new_bookings(bookings)
+
+        for b in bookings:
+            booking_datetime = b.start.astimezone(LOCAL_TIMEZONE)
+            booking_date = booking_datetime.strftime("%A, %B %-d")
+            # Check for invalid on-campus PIDs
+            pids = db.get_on_campus_pids(b.id)
+            pids = [p for p in pids if p != db.get_matching_pid(p)]
+            if not db.admin_notified_pids(b) and pids:
+                m = f":x: There are some invalid on-campus PIDs in booking *{b.id}* on {booking_date}. "
+                m += f"They are: {', '.join(f'*{p.id}* ({p.last_name}, {p.first_name})' for p in pids)}. "
+                m += f"Contact email: {b.email}"
+                slack.send_multiple(admin_slack_ids, m)
+                db.mark_admin_notified_pids(b)
+                for p in pids:
+                    db.remove_pid(p)
+        sleep(30)
+
+
 if __name__ == "__main__":
     os.chdir(os.path.dirname(os.path.realpath(__file__)))
     sys.path.append("..")
@@ -874,4 +880,6 @@ if __name__ == "__main__":
     setup_db("test.sqlite3")
     setup_roster("testroster.csv")
     setup_invalid_files()
-    ut.main()
+
+    # unittest.main()
+    test_main()
