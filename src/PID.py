@@ -14,3 +14,6 @@ class PID:
             and other.id == self.id
             and other.last_name == self.last_name
         )
+
+    def __repr__(self):
+        return f"PID({self.id}, {self.first_name}, {self.last_name})"
