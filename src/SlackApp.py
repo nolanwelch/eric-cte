@@ -48,17 +48,12 @@ class SlackApp:
     def send_message(self, channel_id: str, msg) -> MessageResponse:
         try:
             if self.in_quiet_hrs():
-                now = datetime.now()
-                if now.hour >= self._quiet_hours_start.hour:
-                    now += timedelta(days=1)
-                schedule_dt = datetime(
-                    now.year,
-                    now.month,
-                    now.day,
-                    self._quiet_hours_end.hour,
-                    self._quiet_hours_end.minute,
-                    0,
-                )
+                schedule_dt = datetime.now()
+                if schedule_dt.hour >= self._quiet_hours_start.hour:
+                    schedule_dt += timedelta(days=1)
+                schedule_dt.replace(hour=self._quiet_hours_end.hour)
+                schedule_dt.replace(minute=self._quiet_hours_end.minute)
+                schedule_dt.replace(second=0)
                 return self.schedule_message(channel_id, schedule_dt, msg)
             result = requests.post(
                 "https://slack.com/api/chat.postMessage",
