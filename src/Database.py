@@ -147,9 +147,6 @@ class Database:
             last_change = b.last_change.timestamp()
             q = """INSERT INTO bookings (id, timestamp, lastChange, email)
                 VALUES (?, ?, ?, ?)"""
-            print(b.id)
-            print(timestamp)
-            print(last_change)
             self._cur.execute(
                 q,
                 (b.id, timestamp, last_change, b.email),
