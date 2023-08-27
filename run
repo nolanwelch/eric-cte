@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # All paths relative to this script
 cd "$(dirname "$0")"
