@@ -8,7 +8,7 @@ invalidheader
 invalid.sqlite3
 
 # Developer keys
-config.env
+*.env
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
